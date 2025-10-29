@@ -348,12 +348,12 @@
             flex: 1;
             background: #000;
             position: relative;
-            /* --- FIX: Removed hard border on main container --- */
             margin: 8px;
             border-radius: 8px;
             overflow: hidden;
             min-width: 200px;
             min-height: 300px;
+            border: 1px solid #2a2a2a; /* Added back for desktop */
         }
         
         #container canvas {
@@ -368,9 +368,14 @@
                 flex-direction: column;
             }
             
+            #mainContent {
+                /* FIX: Remove any remaining padding/margin on main content */
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
             #sidebar {
                 width: 100%;
-                /* REMOVED: max-height: 50vh; to allow content to collapse correctly */
                 border-right: none;
                 border-bottom: 1px solid #2a2a2a;
             }
@@ -411,9 +416,14 @@
             
             #container {
                 min-height: 300px;
-                /* --- FIX: Removed margin to allow container to fill bottom edge --- */
+                /* --- ULTIMATE FIX: Zero out all margins and borders --- */
                 margin: 0; 
                 border-radius: 0;
+                border-left: none;
+                border-right: none;
+                border-top: none;
+                /* Force the bottom border to appear */
+                border-bottom: 1px solid #2a2a2a; 
             }
             
             .section-title {
