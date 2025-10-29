@@ -20,7 +20,7 @@
             height: 100vh;
             width: 100vw;
             overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            font-family: -apple-system, BlinkMacMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
             background: #0a0a0a;
             color: #e5e5e5;
         }
@@ -492,7 +492,7 @@
         let currentGridSize = 50;
         let gridHelper;
         let selectedIndices = new Set();
-        let blockGroup; // Group to hold all blocks
+        let blockGroup; 
 
         function loadHistory() {
             const saved = localStorage.getItem('blockHistory');
@@ -732,12 +732,16 @@
         }
 
         function buildModelFromData(input) {
+            // Map to store unique block positions: Key is "x,y,z", Value is {x, y, z, type}
+            const uniqueBlocks = new Map();
+
             // Clear all blocks efficiently using the group
             blockGroup.clear();
 
+            // Split by space, newline, or carriage return, filtering out empty strings
             const entries = input.split(/[\s\r\n]+/).filter(e => e.trim().length > 0);
-            let blocksParsed = 0;
-            
+
+            // --- Pass 1: Parse Input and Deduplicate (Last Writer Wins) ---
             entries.forEach(entry => {
                 const parts = entry.split(',');
                 if (parts.length < 4) return;
@@ -749,7 +753,21 @@
 
                 if (isNaN(x) || isNaN(y) || isNaN(z)) return;
 
-                const color = BLOCK_COLORS[type] || 0xFF1493;
+                // Create a unique key string for the position
+                const positionKey = `${x},${y},${z}`;
+
+                // Store the block data. This ensures that if the key exists, 
+                // the new entry overwrites the old one (Last Writer Wins).
+                uniqueBlocks.set(positionKey, { x, y, z, type });
+            });
+
+            let blocksParsed = 0;
+            let minX = Infinity, minY = Infinity, minZ = Infinity;
+            let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+            
+            // --- Pass 2: Render Only the Unique Blocks from the Map ---
+            uniqueBlocks.forEach(block => {
+                const color = BLOCK_COLORS[block.type] || 0xFF1493;
                 const geometry = new THREE.BoxGeometry(BLOCK_SPACING_FACTOR, BLOCK_SPACING_FACTOR, BLOCK_SPACING_FACTOR);
                 const material = new THREE.MeshStandardMaterial({ 
                     color: color,
@@ -757,23 +775,56 @@
                     roughness: 0.8
                 });
                 
-                if (type === 'glass') {
+                if (block.type === 'glass') {
                     material.transparent = true;
                     material.opacity = 0.4;
                 }
 
                 const cube = new THREE.Mesh(geometry, material);
-                cube.position.set(
-                    x * BLOCK_SPACING_FACTOR,
-                    y * BLOCK_SPACING_FACTOR,
-                    z * BLOCK_SPACING_FACTOR
-                );
+                const actualX = block.x * BLOCK_SPACING_FACTOR;
+                const actualY = block.y * BLOCK_SPACING_FACTOR;
+                const actualZ = block.z * BLOCK_SPACING_FACTOR;
                 
-                blockGroup.add(cube); // Add to group instead of scene
+                cube.position.set(actualX, actualY, actualZ);
+                
+                // Update bounds for camera centering
+                minX = Math.min(minX, actualX);
+                maxX = Math.max(maxX, actualX);
+                minY = Math.min(minY, actualY);
+                maxY = Math.max(maxY, actualY);
+                minZ = Math.min(minZ, actualZ);
+                maxZ = Math.max(maxZ, actualZ);
+
+                blockGroup.add(cube);
                 blocksParsed++;
             });
             
-            console.log(`Loaded ${blocksParsed} blocks`);
+            // --- Final Step: Center Camera on the Model ---
+            if (blocksParsed > 0) {
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+                const centerZ = (minZ + maxZ) / 2;
+
+                // Calculate the largest dimension (to set camera distance)
+                const sizeX = maxX - minX;
+                const sizeY = maxY - minY;
+                const sizeZ = maxZ - minZ;
+                const maxDim = Math.max(sizeX, sizeY, sizeZ);
+                
+                // Set the controls target (the point the camera rotates around)
+                controls.target.set(centerX, centerY, centerZ);
+                
+                // Calculate new camera distance (based on max dimension and camera FOV)
+                const distance = maxDim / (2 * Math.tan(camera.fov * Math.PI / 360));
+                
+                // Set camera position to look at the center from a distance
+                camera.position.set(centerX + distance, centerY + distance / 2, centerZ + distance);
+
+                // Update controls to apply the new target
+                controls.update();
+            }
+
+            console.log(`Loaded ${blocksParsed} unique blocks after deduplication.`);
             return blocksParsed;
         }
 
