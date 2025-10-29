@@ -492,6 +492,7 @@
         let currentGridSize = 50;
         let gridHelper;
         let selectedIndices = new Set();
+        let blockGroup; // Group to hold all blocks
 
         function loadHistory() {
             const saved = localStorage.getItem('blockHistory');
@@ -677,6 +678,10 @@
             gridHelper = new THREE.GridHelper(currentGridSize, currentGridSize, 0x333333, 0x1a1a1a);
             scene.add(gridHelper);
 
+            // Create a group to hold all blocks
+            blockGroup = new THREE.Group();
+            scene.add(blockGroup);
+
             // Add a starter block to show the scene is active
             addStarterBlock();
 
@@ -692,8 +697,7 @@
             });
             const starterCube = new THREE.Mesh(geometry, material);
             starterCube.position.set(0, 0, 0);
-            starterCube.userData.isStarter = true;
-            scene.add(starterCube);
+            blockGroup.add(starterCube);
         }
 
         const BLOCK_COLORS = {
@@ -728,16 +732,8 @@
         }
 
         function buildModelFromData(input) {
-            let i = scene.children.length;
-            while(i--) {
-                const child = scene.children[i];
-                if (child.isMesh) {
-                    scene.remove(child);
-                }
-            }
-
-            const newGridHelper = new THREE.GridHelper(currentGridSize, currentGridSize, 0x333333, 0x1a1a1a);
-            scene.add(newGridHelper);
+            // Clear all blocks efficiently using the group
+            blockGroup.clear();
 
             const entries = input.split(/[\s\r\n]+/).filter(e => e.trim().length > 0);
             let blocksParsed = 0;
@@ -773,7 +769,7 @@
                     z * BLOCK_SPACING_FACTOR
                 );
                 
-                scene.add(cube);
+                blockGroup.add(cube); // Add to group instead of scene
                 blocksParsed++;
             });
             
