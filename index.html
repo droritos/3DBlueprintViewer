@@ -501,6 +501,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script>
+        // --- STARTUP DATA (FANTASY FOUNTAIN) ---
+        const STARTER_BLUEPRINT = `2,1,2,SmoothStone 5,1,2,SmoothStone 2,1,5,SmoothStone 5,1,5,SmoothStone 3,1,2,SmoothStone 4,1,2,SmoothStone 3,1,5,SmoothStone 4,1,5,SmoothStone 2,1,3,SmoothStone 5,1,3,SmoothStone 2,1,4,SmoothStone 5,1,4,SmoothStone 3,1,3,DarkStone 4,1,3,DarkStone 3,1,4,DarkStone 4,1,4,DarkStone 3,2,3,Glass 4,2,3,Glass 3,2,4,Glass 4,2,4,Glass 3,3,3,SmoothStone 4,3,3,SmoothStone 3,3,4,SmoothStone 4,3,4,SmoothStone 3,4,3,DarkStone 4,4,3,DarkStone 3,4,4,DarkStone 4,4,4,DarkStone 3,5,3,Glass 4,5,3,Glass 3,5,4,Glass 4,5,4,Glass 1,1,1,Leaf 6,1,1,Leaf 1,1,6,Leaf 6,1,6,Leaf 1,2,1,Leaf 6,2,1,Leaf 1,2,6,Leaf 6,2,6,Leaf 1,3,1,Leaf 6,3,1,Leaf 1,3,6,Leaf 6,3,6,Leaf 1,4,1,Leaf 6,4,1,Leaf 1,4,6,Leaf 6,4,6,Leaf`;
+
+        // --- GLOBAL VARIABLES ---
         let scene, camera, renderer, controls;
         const BLOCK_SPACING_FACTOR = 2;
         let history = [];
@@ -510,6 +514,15 @@
         let selectedIndices = new Set();
         let blockGroup; 
 
+        // --- BLOCK COLORS ---
+        const BLOCK_COLORS = {
+            'dirt': 0x8B4513, 'wood': 0xA0522D, 'leaf': 0x006400, 'stone': 0x808080,
+            'crate': 0xCC9966, 'darkstone': 0x3C3C3C, 'glass': 0xADD8E6, 'gravel': 0x737373,
+            'graybrick': 0x999999, 'hay': 0xFFD700, 'metal': 0xB0C4DE, 'metalframe': 0x36454F,
+            'redbrick': 0x8B0000, 'sand': 0xF4A460, 'smoothstone': 0xC0C0C0, 'snow': 0xFFFFFF
+        };
+
+        // --- HISTORY & UTILITY FUNCTIONS ---
         function loadHistory() {
             const saved = localStorage.getItem('blockHistory');
             if (saved) {
@@ -658,6 +671,7 @@
             document.getElementById('blueprintInput').value = '';
         }
 
+        // --- CORE 3D FUNCTIONS ---
         function init3D() {
             const container = document.getElementById('container');
             if (!container) return;
@@ -698,53 +712,7 @@
             blockGroup = new THREE.Group();
             scene.add(blockGroup);
 
-            // Add a starter block to show the scene is active
-            addStarterBlock();
-
             animate();
-        }
-
-        function addStarterBlock() {
-            const geometry = new THREE.BoxGeometry(BLOCK_SPACING_FACTOR, BLOCK_SPACING_FACTOR, BLOCK_SPACING_FACTOR);
-            const material = new THREE.MeshStandardMaterial({ 
-                color: 0xC0C0C0,
-                metalness: 0.1,
-                roughness: 0.8
-            });
-            const starterCube = new THREE.Mesh(geometry, material);
-            starterCube.position.set(0, 0, 0);
-            blockGroup.add(starterCube);
-        }
-
-        const BLOCK_COLORS = {
-            'dirt': 0x8B4513, 'wood': 0xA0522D, 'leaf': 0x006400, 'stone': 0x808080,
-            'crate': 0xCC9966, 'darkstone': 0x3C3C3C, 'glass': 0xADD8E6, 'gravel': 0x737373,
-            'graybrick': 0x999999, 'hay': 0xFFD700, 'metal': 0xB0C4DE, 'metalframe': 0x36454F,
-            'redbrick': 0x8B0000, 'sand': 0xF4A460, 'smoothstone': 0xC0C0C0, 'snow': 0xFFFFFF
-        };
-
-        function showFeedback(message, type = 'success') {
-            const feedback = document.getElementById('feedbackMessage');
-            feedback.textContent = message;
-            feedback.className = type;
-            
-            setTimeout(() => {
-                feedback.classList.add('hidden');
-            }, 3000);
-        }
-
-        function buildModel() {
-            const input = document.getElementById('blueprintInput').value;
-            if (!input.trim()) {
-                showFeedback('Please enter blueprint data', 'error');
-                return;
-            }
-            
-            addToHistory(input);
-            const count = buildModelFromData(input);
-            showFeedback(`Model built successfully (${count} blocks)`, 'success');
-            
-            collapseMobileSections();
         }
 
         function buildModelFromData(input) {
@@ -769,11 +737,7 @@
 
                 if (isNaN(x) || isNaN(y) || isNaN(z)) return;
 
-                // Create a unique key string for the position
                 const positionKey = `${x},${y},${z}`;
-
-                // Store the block data. This ensures that if the key exists, 
-                // the new entry overwrites the old one (Last Writer Wins).
                 uniqueBlocks.set(positionKey, { x, y, z, type });
             });
 
@@ -821,29 +785,50 @@
                 const centerY = (minY + maxY) / 2;
                 const centerZ = (minZ + maxZ) / 2;
 
-                // Calculate the largest dimension (to set camera distance)
                 const sizeX = maxX - minX;
                 const sizeY = maxY - minY;
                 const sizeZ = maxZ - minZ;
                 const maxDim = Math.max(sizeX, sizeY, sizeZ);
                 
-                // Set the controls target (the point the camera rotates around)
                 controls.target.set(centerX, centerY, centerZ);
                 
-                // Calculate new camera distance (based on max dimension and camera FOV)
-                const distance = maxDim / (2 * Math.tan(camera.fov * Math.PI / 360));
+                const distance = maxDim / (2 * Math.tan(camera.fov * Math.PI / 360)) * 1.5; // * 1.5 for padding
                 
-                // Set camera position to look at the center from a distance
                 camera.position.set(centerX + distance, centerY + distance / 2, centerZ + distance);
 
-                // Update controls to apply the new target
                 controls.update();
+            } else {
+                // If no blocks, reset camera to origin
+                controls.target.set(0, 0, 0);
+                camera.position.set(25, 25, 25);
+                controls.update();
+                // Add a single starter block to show scene is active
+                const geometry = new THREE.BoxGeometry(BLOCK_SPACING_FACTOR, BLOCK_SPACING_FACTOR, BLOCK_SPACING_FACTOR);
+                const material = new THREE.MeshStandardMaterial({ color: 0xC0C0C0, metalness: 0.1, roughness: 0.8 });
+                const starterCube = new THREE.Mesh(geometry, material);
+                starterCube.position.set(0, 0, 0);
+                blockGroup.add(starterCube);
             }
 
             console.log(`Loaded ${blocksParsed} unique blocks after deduplication.`);
             return blocksParsed;
         }
 
+        function buildModel() {
+            const input = document.getElementById('blueprintInput').value;
+            if (!input.trim()) {
+                showFeedback('Please enter blueprint data', 'error');
+                return;
+            }
+            
+            addToHistory(input);
+            const count = buildModelFromData(input);
+            showFeedback(`Model built successfully (${count} blocks)`, 'success');
+            
+            collapseMobileSections();
+        }
+        
+        // --- UI & WINDOW HANDLERS ---
         function updateGridSize() {
             const newSize = parseInt(document.getElementById('gridSize').value);
             if (newSize && newSize >= 10 && newSize <= 1000) {
@@ -885,6 +870,15 @@
         window.onload = function() {
             init3D();
             loadHistory();
+            
+            // --- STARTUP LOGIC ---
+            if (STARTER_BLUEPRINT) {
+                // Load the large structure instead of the single cube
+                buildModelFromData(STARTER_BLUEPRINT);
+                // Set the input field to display the code so the user can copy/edit it
+                document.getElementById('blueprintInput').value = STARTER_BLUEPRINT.replace(/ /g, '\n'); 
+            }
+            // If STARTER_BLUEPRINT is not present, buildModelFromData calls the single starter cube fallback.
             
             if (window.innerWidth <= 768) {
                 collapseMobileSections();
